@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import bpy
 import bmesh
 
@@ -66,18 +68,17 @@ class Surface(object):
 
     return
 
-  #def __triangulate(self,v):
+  def __triangulate(self,v):
 
-    #from scipy.spatial import Delaunay as delaunay
-    #flags = 'QJ Qc Pp'
+    from scipy.spatial import Delaunay as delaunay
+    flags = 'QJ Qc Pp'
 
-    #tri = delaunay(v,
-                   #incremental=False,
-                   #qhull_options=flags)
+    tri = delaunay(v,
+                   incremental=False,
+                   qhull_options=flags)
 
-    #simplex_vertex = tri.simplices
-
-    #return simplex_vertex
+    simplex_vertex = tri.simplices
+    return simplex_vertex
 
   def __get_face_centroids(self,vertices,face_vertices):
 
@@ -125,12 +126,12 @@ class Surface(object):
     edges = list(bm.edges)
     self.edges = edges #print(list(e.link_faces))
 
-    self.face_centroids = self.__get_face_centroids(vertices,face_vertices)
+    face_centroids = self.__get_face_centroids(vertices,face_vertices)
+    self.face_centroids = face_centroids
 
-    #tri_simplex_vertex = self.__triangulate(self.face_centroids[face_vertices_ind,:])
-    #tri_edges = self.__get_tri_edges(tri_simplex_vertex) #
-
-    #self.tri_edges = face_vertices_ind[tri_edges]
+    tri_simplex_vertex = self.__triangulate(row_stack([f for i,f in self.face_centroids.items()]))
+    tri_edges = self.__get_tri_edges(tri_simplex_vertex) #
+    self.tri_edges = tri_edges
 
     return
 
@@ -140,13 +141,13 @@ class Surface(object):
     from numpy.linalg import norm
 
     nearl = self.nearl
-    #farl = self.farl
+    farl = self.farl
 
     vertices = self.vertices
     face_vertices = self.face_vertices
     face_vertex_indices = self.face_vertex_indices
     face_centroids = self.face_centroids
-    #tri_edges = self.tri_edges
+    tri_edges = self.tri_edges
     edges = self.edges
     vnum = self.vnum
     nmax = self.nmax
@@ -156,36 +157,34 @@ class Surface(object):
 
     ## attract
     for edge in edges:
-      f1,f2 = edge.link_faces
+      try:
+        f1,f2 = edge.link_faces
 
-      vdx = face_centroids[f1.index]-face_centroids[f2.index]
+        vdx = face_centroids[f1.index]-face_centroids[f2.index]
+        nrm = norm(vdx)
+
+        if nrm<nearl:
+          continue
+
+        force = -vdx/nrm*0.5
+
+        dx_attract[f1.index,:] += force
+        dx_attract[f2.index,:] -= force
+      except Exception:
+        pass
+
+    # reject
+    ## TODO: vectorize
+    for a,b in tri_edges:
+      v1 = face_centroids[a]
+      v2 = face_centroids[b]
+      vdx = v2-v1
       nrm = norm(vdx)
 
-      if nrm<nearl:
-        continue
-
-      force = -vdx/nrm*0.5
-
-      dx_attract[f1.index,:] += force
-      dx_attract[f2.index,:] -= force
-
-    ## reject
-    ### TODO: vectorize
-    #for a,b in tri_edges:
-      #v1 = face_centroids[a,:]
-
-    ## reject
-    ### TODO: vectorize
-    #for a,b in tri_edges:
-      #v1 = face_centroids[a,:]
-      #v2 = face_centroids[b,:]
-      #vdx = v2-v1
-      #nrm = norm(vdx)
-
-      #if nrm<farl:
-        #force = (farl/nrm-1.)*vdx
-        #dx_reject[a,:] -= force
-        #dx_reject[b,:] += force
+      if nrm<farl:
+        force = (farl/nrm-1.)*vdx
+        dx_reject[a,:] -= force
+        dx_reject[b,:] += force
 
     dx_attract *= self.stp_attract
     dx_reject *= self.stp_reject
@@ -221,7 +220,7 @@ class Surface(object):
 
     self.itt += 1
     self.update_face_structure()
-    #self.vertex_noise()
+    self.vertex_noise()
 
     self.balance()
 
@@ -230,6 +229,13 @@ class Surface(object):
       v.co = vertices[i,:]
 
     self.__to_mesh()
+    
+    if not self.itt%10:
+      bpy.ops.object.modifier_add(type='REMESH')
+      self.obj.modifiers['Remesh'].mode = 'SMOOTH'
+      self.obj.modifiers['Remesh'].scale = 0.7
+      self.obj.modifiers['Remesh'].octree_depth = 6
+      bpy.ops.object.modifier_apply(modifier='Remesh',apply_as='DATA')
 
     return
 
@@ -237,13 +243,13 @@ def main():
 
   from time import time
 
-  steps = 100
+  steps = 200
 
-  noise = 0.01
-  stp_attract = 0.01
-  stp_reject = 0.01
+  noise = 0.0008
+  stp_attract = 0.02
+  stp_reject = 0.005
   nearl = 0.1
-  farl = 5.0
+  farl = 4.0
   obj_name = 'geom'
   out_fn = 'res'
 
@@ -266,6 +272,7 @@ def main():
     except KeyboardInterrupt:
       print('KeyboardInterrupt')
       break
+
 
   S.save('./res/{:s}.blend'.format(out_fn))
 
