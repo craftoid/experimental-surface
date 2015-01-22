@@ -1,0 +1,7 @@
+.ropeproject
+res/*.blend*
+.*.swp
+*.blend1
+res/*
+modules/__*
+*.bak
