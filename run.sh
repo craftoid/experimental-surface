@@ -2,7 +2,8 @@
 
 set -e
 
-blender="/usr/share/blender/blender"
+## My blender path for OSX
+blender="/Applications/Blender/blender.app/Contents/MacOS/blender"
 base_mesh_name="$1"
 
 here=$(pwd)
@@ -20,7 +21,6 @@ if [ ! -f "$base" ]; then
   echo "no such file: $base";
   exit 1;
 fi
-
 
 "$blender" "$base" -b -P "$generate"
 

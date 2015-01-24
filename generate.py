@@ -3,7 +3,6 @@
 import bpy
 import bmesh
 
-
 class Surface(object):
 
   def __init__(self,
