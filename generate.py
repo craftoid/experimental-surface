@@ -243,7 +243,7 @@ def main():
 
   from time import time
 
-  steps = 200
+  steps = 50
 
   noise = 0.0008
   stp_attract = 0.02
@@ -267,7 +267,9 @@ def main():
       S.step()
       itt = S.itt
       if not itt%10:
-        print(itt)
+        fnitt = './res/{:s}_{:05d}.blend'.format(out_fn,itt)
+        S.save(fnitt)
+        print(fnitt)
 
     except KeyboardInterrupt:
       print('KeyboardInterrupt')
